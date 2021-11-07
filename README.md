@@ -11,6 +11,8 @@
 
 ## Download binaries
 
+> :warning: be sure to run the following command in root directory
+
 ```bash
 curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.3.3 1.5.2
 ```

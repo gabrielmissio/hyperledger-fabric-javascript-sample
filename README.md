@@ -1,8 +1,11 @@
 # hyperledger-fabric-easy-sample-javascript
 
 ## Dependencies
+
  - Git
+
  - cURL
+
  - Docker
 
 
@@ -29,6 +32,8 @@ curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.3.3 1.5.2
 ```
 
 ## Interacting with the network
+
+> :warning: be sure to run the following command in /test-network directory
 
 ### Set the environment variables
 

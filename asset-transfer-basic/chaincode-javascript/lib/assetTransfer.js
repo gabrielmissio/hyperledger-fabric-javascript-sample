@@ -1,9 +1,3 @@
-/*
- * Copyright IBM Corp. All Rights Reserved.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 'use strict';
 
 // Deterministic JSON.stringify()
@@ -11,137 +5,96 @@ const stringify  = require('json-stringify-deterministic');
 const sortKeysRecursive  = require('sort-keys-recursive');
 const { Contract } = require('fabric-contract-api');
 
-class AssetTransfer extends Contract {
-
+class CoinTransfer extends Contract {
     async InitLedger(ctx) {
-        const assets = [
+        const wallets = [
             {
-                ID: 'asset1',
-                Color: 'blue',
-                Size: 5,
-                Owner: 'Missio',
-                AppraisedValue: 300,
+                Address: 'Address01',
+                Balance: 1000
             },
             {
-                ID: 'asset2',
-                Color: 'red',
-                Size: 5,
-                Owner: 'Brad',
-                AppraisedValue: 400,
-            },
-            {
-                ID: 'asset3',
-                Color: 'green',
-                Size: 10,
-                Owner: 'Jin Soo',
-                AppraisedValue: 500,
-            },
-            {
-                ID: 'asset4',
-                Color: 'yellow',
-                Size: 10,
-                Owner: 'Max',
-                AppraisedValue: 600,
-            },
-            {
-                ID: 'asset5',
-                Color: 'black',
-                Size: 15,
-                Owner: 'Adriana',
-                AppraisedValue: 700,
-            },
-            {
-                ID: 'asset6',
-                Color: 'white',
-                Size: 15,
-                Owner: 'Missio',
-                AppraisedValue: 800,
-            },
+                Address: 'Address02',
+                Balance: 1000
+            }
         ];
 
-        for (const asset of assets) {
-            asset.docType = 'asset';
-            // example of how to write to world state deterministically
-            // use convetion of alphabetic order
-            // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-            // when retrieving data, in any lang, the order of data will be the same and consequently also the corresonding hash
-            await ctx.stub.putState(asset.ID, Buffer.from(stringify(sortKeysRecursive(asset))));
+        for (const wallet of wallets) {
+            await ctx.stub.putState(wallet.Address, Buffer.from(stringify(sortKeysRecursive(wallet))));
         }
     }
 
-    // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, color, size, owner, appraisedValue) {
-        const exists = await this.AssetExists(ctx, id);
+    async WalletExists(ctx, address) {
+        const assetJSON = await ctx.stub.getState(address);
+        return assetJSON && assetJSON.length > 0;
+    }
+
+    async CreateWallet(ctx, address) {
+        const exists = await this.WalletExists(ctx, address);
         if (exists) {
-            throw new Error(`The asset ${id} already exists`);
+            throw new Error(`The wallet ${address} already exists`);
         }
 
-        const asset = {
-            ID: id,
-            Color: color,
-            Size: size,
-            Owner: owner,
-            AppraisedValue: appraisedValue,
+        const wallet = {
+            Address: address,
+            Balance: 0
         };
+    
         //we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        await ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(asset))));
-        return JSON.stringify(asset);
+        await ctx.stub.putState(wallet.Address, Buffer.from(stringify(sortKeysRecursive(wallet))));
+        return JSON.stringify(wallet);
     }
 
-    // ReadAsset returns the asset stored in the world state with given id.
-    async ReadAsset(ctx, id) {
-        const assetJSON = await ctx.stub.getState(id); // get the asset from chaincode state
+    async ReadWallet(ctx, address) {
+        const assetJSON = await ctx.stub.getState(address); // get the asset from chaincode state
         if (!assetJSON || assetJSON.length === 0) {
-            throw new Error(`The asset ${id} does not exist`);
+            throw new Error(`The asset ${address} does not exist`);
         }
         return assetJSON.toString();
     }
 
-    // UpdateAsset updates an existing asset in the world state with provided parameters.
-    async UpdateAsset(ctx, id, color, size, owner, appraisedValue) {
-        const exists = await this.AssetExists(ctx, id);
-        if (!exists) {
-            throw new Error(`The asset ${id} does not exist`);
+    async AddFunds(ctx, address, value) {
+        // TODO: ensure value is Number
+        const walletString = await this.ReadWallet(ctx, address);
+        const wallet = JSON.parse(walletString);
+        wallet.Balance = wallet.Balance + parseFloat(value);
+
+        await ctx.stub.putState(address, Buffer.from(stringify(sortKeysRecursive(wallet))));
+        return `success adding ${value} to funds to wallet with address ${address}` 
+    }
+
+    ValidateTranfer(wallet, value) {
+        const erros = [];
+        const haveEnoughBalance = wallet.Balance >= parseFloat(value);
+        if (!haveEnoughBalance) {
+            erros.push({ 'insufficient-balance': `The wallet with address ${wallet.Address} does not have enough balance to transfer ${value}` })
         }
 
-        // overwriting original asset with new asset
-        const updatedAsset = {
-            ID: id,
-            Color: color,
-            Size: size,
-            Owner: owner,
-            AppraisedValue: appraisedValue,
-        };
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        return ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(updatedAsset))));
+        return erros;
     }
 
-    // DeleteAsset deletes an given asset from the world state.
-    async DeleteAsset(ctx, id) {
-        const exists = await this.AssetExists(ctx, id);
-        if (!exists) {
-            throw new Error(`The asset ${id} does not exist`);
+    async TransferCoin(ctx, senderAddress, receiverAddress, value) {
+        // TODO: ensure value is Number
+        const senderWalletString = await this.ReadWallet(ctx, senderAddress);
+        const receiverWalletString = await this.ReadWallet(ctx, receiverAddress);
+        
+        const senderWallet = JSON.parse(senderWalletString);
+        const receiverWallet = JSON.parse(receiverWalletString);
+
+        const errors = this.ValidateTranfer(senderWallet, value);
+        if (errors.length && errors.length > 0) {
+            throw new Error(`The following errors were found: ${JSON.stringify(errors)}`);
         }
-        return ctx.stub.deleteState(id);
+
+        receiverWallet.Balance = receiverWallet.Balance + parseFloat(value);
+        senderWallet.Balance = senderWallet.Balance - parseFloat(value);
+
+        await ctx.stub.putState(receiverWallet.Address, Buffer.from(stringify(sortKeysRecursive(receiverWallet))));
+        await ctx.stub.putState(senderWallet.Address, Buffer.from(stringify(sortKeysRecursive(senderWallet))));
+
+        return `successful transferring ${value} of the funds from the wallet with address ${senderAddress} to the wallet with address ${receiverAddress}`
     }
 
-    // AssetExists returns true when asset with given ID exists in world state.
-    async AssetExists(ctx, id) {
-        const assetJSON = await ctx.stub.getState(id);
-        return assetJSON && assetJSON.length > 0;
-    }
-
-    // TransferAsset updates the owner field of asset with given id in the world state.
-    async TransferAsset(ctx, id, newOwner) {
-        const assetString = await this.ReadAsset(ctx, id);
-        const asset = JSON.parse(assetString);
-        asset.Owner = newOwner;
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        return ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(asset))));
-    }
-
-    // GetAllAssets returns all assets found in the world state.
-    async GetAllAssets(ctx) {
+    async GetAllWallets(ctx) {
         const allResults = [];
         // range query with empty string for startKey and endKey does an open-ended query of all assets in the chaincode namespace.
         const iterator = await ctx.stub.getStateByRange('', '');
@@ -162,4 +115,4 @@ class AssetTransfer extends Contract {
     }
 }
 
-module.exports = AssetTransfer;
+module.exports = CoinTransfer;

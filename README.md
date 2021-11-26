@@ -1,4 +1,4 @@
-# hyperledger-fabric-easy-sample-javascript
+# hyperledger-fabric-javascript-sample
 
 ## Dependencies
 

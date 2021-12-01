@@ -1,7 +1,6 @@
 # hyperledger-fabric-javascript-sample
 
-> :construction: If your primary operating system is Windows, consider using WSL (Windows Subsystem for Linux).
-> :construction: See how to enable and use WSL at this [link](https://docs.microsoft.com/en-us/windows/wsl/install-manual)
+> :construction: If your primary operating system is Windows, consider using WSL (Windows Subsystem for Linux). See how to enable and use WSL at this [link](https://docs.microsoft.com/en-us/windows/wsl/install-manual)
 
 ## Dependencies
 
